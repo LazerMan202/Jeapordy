@@ -1,0 +1,471 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Jeopardy Builder 1.0</title>
+<style>
+:root {
+  --blue:#071b85;
+  --tile:#1029b7;
+  --gold:#ffdc52;
+  --bg:#050b24;
+  --panel:#111a39;
+}
+*{box-sizing:border-box}
+body{
+  margin:0;background:var(--bg);color:white;
+  font-family:Arial,Helvetica,sans-serif;
+}
+button,input,textarea,select{font:inherit}
+button{cursor:pointer}
+header{
+  display:flex;justify-content:space-between;align-items:center;
+  gap:12px;padding:14px 20px;background:#080f34;
+  border-bottom:2px solid #3447b6;flex-wrap:wrap;
+}
+h1{margin:0;color:var(--gold);font-size:clamp(22px,4vw,34px)}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap}
+.btn{
+  border:1px solid #6578d8;background:#202e70;color:white;
+  padding:9px 13px;border-radius:7px;
+}
+.btn:hover{filter:brightness(1.25)}
+.btn.primary{background:#d6a900;color:#101020;border-color:#ffe47b;font-weight:bold}
+.btn.danger{background:#762d3b}
+main{max-width:1600px;margin:auto;padding:15px}
+.teams{
+  display:flex;justify-content:center;gap:12px;flex-wrap:wrap;
+  margin:5px 0 20px;
+}
+.team{
+  background:var(--panel);border:1px solid #4658a7;
+  padding:10px 14px;border-radius:10px;min-width:145px;text-align:center;
+}
+.team input{
+  width:100%;background:transparent;color:white;border:0;
+  text-align:center;font-weight:bold;font-size:17px;
+}
+.score{font-size:25px;color:var(--gold);font-weight:bold;margin:8px}
+.team button{padding:4px 9px;margin:2px}
+.board{
+  display:grid;grid-template-columns:repeat(5,minmax(0,1fr));
+  gap:6px;background:#02062b;padding:6px;border-radius:9px;
+}
+.category{
+  background:var(--blue);color:white;text-align:center;
+  display:flex;justify-content:center;align-items:center;
+  min-height:85px;padding:8px;font-size:clamp(11px,1.7vw,20px);
+  font-weight:900;text-transform:uppercase;overflow-wrap:anywhere;
+}
+.clue{
+  background:var(--tile);color:var(--gold);border:0;
+  min-height:85px;font-size:clamp(17px,3vw,30px);
+  font-weight:900;text-shadow:2px 2px #000;
+}
+.clue:hover:not(:disabled){background:#2547eb}
+.clue:disabled{background:#101947;color:#5c6598;cursor:default;text-shadow:none}
+.status{text-align:center;color:#aebcf9;margin:12px 0}
+footer{text-align:center;padding:20px;color:#8794d4;font-size:13px}
+.overlay{
+  display:none;position:fixed;inset:0;z-index:5;
+  background:#000d;align-items:center;justify-content:center;padding:12px;
+}
+.overlay.open{display:flex}
+.dialog{
+  width:min(900px,100%);max-height:94vh;overflow:auto;
+  background:#101a48;border:2px solid #667cff;
+  border-radius:15px;padding:clamp(15px,4vw,32px);
+  box-shadow:0 0 40px #000;
+}
+.dialog h2{color:var(--gold);margin-top:0}
+.question-text{
+  text-align:center;font-size:clamp(22px,4vw,42px);
+  font-weight:bold;line-height:1.4;margin:30px 0;
+}
+.answer{
+  text-align:center;font-size:clamp(19px,3vw,30px);
+  color:#78ffc5;padding:20px;border:1px dashed #78ffc5;
+  margin-bottom:20px;display:none;
+}
+.actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.editor-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.field{display:flex;flex-direction:column;gap:5px;margin:8px 0}
+.field label{color:#bdc8ff;font-size:13px}
+.field input,.field textarea,.field select{
+  background:#080f30;color:white;border:1px solid #5061ad;
+  border-radius:6px;padding:10px;width:100%;
+}
+.field textarea{min-height:65px;resize:vertical}
+.editor-card{
+  background:#172354;border:1px solid #40539a;
+  padding:12px;border-radius:9px;margin:12px 0;
+}
+.small{font-size:12px;color:#aab8f5}
+#toast{text-align:center;color:#80ffb6;min-height:20px}
+@media(max-width:600px){
+  main{padding:7px}
+  .board{gap:3px;padding:3px}
+  .category,.clue{min-height:65px;padding:3px}
+  .teams{gap:5px}
+  .team{min-width:105px;padding:7px}
+  .editor-grid{grid-template-columns:1fr}
+  header{padding:12px}
+}
+</style>
+</head>
+<body>
+<header>
+  <h1 id="gameTitle">JEOPARDY!</h1>
+  <div class="toolbar">
+    <button class="btn" onclick="openEditor()">✏️ Customize</button>
+    <button class="btn" onclick="addTeam()">＋ Team</button>
+    <button class="btn" onclick="saveGame()">💾 Save</button>
+    <button class="btn" onclick="exportGame()">⬇ Export</button>
+    <button class="btn" onclick="document.getElementById('importFile').click()">⬆ Import</button>
+    <input type="file" id="importFile" accept=".json,application/json" hidden onchange="importGame(event)">
+  </div>
+</header>
+
+<main>
+  <div id="teams" class="teams"></div>
+  <div id="board" class="board"></div>
+  <div class="status" id="status">Choose a clue to begin!</div>
+  <div id="toast"></div>
+</main>
+<footer>JEOPARDY BUILDER 1.0 · Customize your own trivia game</footer>
+
+<!-- Question window -->
+<div class="overlay" id="questionModal">
+  <div class="dialog">
+    <h2 id="clueHeading">CATEGORY · 200</h2>
+    <div class="question-text" id="questionText"></div>
+    <div class="answer" id="answerText"></div>
+    <div class="field">
+      <label for="activeTeam">Award or subtract points from:</label>
+      <select id="activeTeam"></select>
+    </div>
+    <div class="actions">
+      <button class="btn primary" onclick="revealAnswer()">Reveal Answer</button>
+      <button class="btn" onclick="scoreClue(1)">✓ Correct (+ points)</button>
+      <button class="btn danger" onclick="scoreClue(-1)">✗ Incorrect (− points)</button>
+      <button class="btn" onclick="scoreClue(0)">Skip / Close</button>
+    </div>
+    <p class="small" style="text-align:center">Scoring marks this clue as used. Skip leaves it available.</p>
+  </div>
+</div>
+
+<!-- Editor window -->
+<div class="overlay" id="editorModal">
+  <div class="dialog">
+    <h2>Game customization</h2>
+    <div class="field">
+      <label>Game title</label>
+      <input id="editTitle" maxlength="80">
+    </div>
+    <div class="field">
+      <label>Starting points for new teams</label>
+      <input id="editStart" type="number" value="0">
+    </div>
+    <p class="small">Edit your categories, clues, and answers below. Blank clues can be left unused.</p>
+    <div id="editorContent"></div>
+    <div class="actions">
+      <button class="btn primary" onclick="applyEditor()">Apply Changes</button>
+      <button class="btn" onclick="closeEditor()">Cancel</button>
+      <button class="btn danger" onclick="restoreDefaults()">Restore Sample Game</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+
+function makeDefault(){
+  const cats=[
+    ["Science",[
+      ["What planet is known as the Red Planet?","Mars"],
+      ["What gas do plants absorb?","Carbon dioxide"],
+      ["What is H2O commonly called?","Water"],
+      ["What force pulls objects toward Earth?","Gravity"],
+      ["What is the closest star to Earth?","The Sun"]
+    ]],
+    ["History",[
+      ["What ancient civilization built the pyramids at Giza?","Ancient Egypt"],
+      ["Who was Canada's first prime minister?","John A. Macdonald"],
+      ["In which year did World War II end?","1945"],
+      ["What ship sank in 1912?","The Titanic"],
+      ["What wall divided Berlin during the Cold War?","The Berlin Wall"]
+    ]],
+    ["Geography",[
+      ["What is the capital of Canada?","Ottawa"],
+      ["What is the world's largest ocean?","The Pacific Ocean"],
+      ["What is the largest country by area?","Russia"],
+      ["On which continent is Kenya?","Africa"],
+      ["What is the capital of Alberta?","Edmonton"]
+    ]],
+    ["Animals",[
+      ["What is the largest land animal?","The African elephant"],
+      ["What do you call a baby frog?","A tadpole"],
+      ["What is the fastest land animal?","The cheetah"],
+      ["What is a group of wolves called?","A pack"],
+      ["Which mammal lays eggs and has a duck-like bill?","The platypus"]
+    ]],
+    ["Random",[
+      ["How many sides does a hexagon have?","Six"],
+      ["How many days are in a leap year?","366"],
+      ["What is 12 × 12?","144"],
+      ["How many colours are in a traditional rainbow?","Seven"],
+      ["What is the main language spoken in Brazil?","Portuguese"]
+    ]]
+  ];
+  return {
+    title:"JEOPARDY!",
+    start:0,
+    categories:cats.map(([name,qs])=>({
+      name, clues:qs.map(([q,a],i)=>({
+        value:(i+1)*200,question:q,answer:a,used:false
+      }))
+    })),
+    teams:[
+      {name:"Team 1",score:0},
+      {name:"Team 2",score:0}
+    ]
+  };
+}
+let game=makeDefault();
+let current=null;
+let editing=null;
+let nextTeam=3;
+
+function render(){
+  $("gameTitle").textContent=game.title||"JEOPARDY!";
+  document.title=(game.title||"Jeopardy")+" - Jeopardy Builder";
+  renderTeams();
+  renderBoard();
+}
+function renderTeams(){
+  $("teams").innerHTML="";
+  game.teams.forEach((t,i)=>{
+    const el=document.createElement("div");
+    el.className="team";
+    const name=document.createElement("input");
+    name.value=t.name;
+    name.maxLength=40;
+    name.setAttribute("aria-label","Team name");
+    name.onchange=()=>{t.name=name.value.trim()||"Team "+(i+1);renderTeams();};
+    const score=document.createElement("div");
+    score.className="score";
+    score.textContent=t.score.toLocaleString();
+    const controls=document.createElement("div");
+    const minus=document.createElement("button");
+    minus.className="btn";minus.textContent="−100";
+    minus.onclick=()=>{t.score-=100;renderTeams();};
+    const plus=document.createElement("button");
+    plus.className="btn";plus.textContent="+100";
+    plus.onclick=()=>{t.score+=100;renderTeams();};
+    controls.append(minus,plus);
+    el.append(name,score,controls);
+    $("teams").append(el);
+  });
+}
+function renderBoard(){
+  const board=$("board");board.innerHTML="";
+  game.categories.forEach((cat,ci)=>{
+    const head=document.createElement("div");
+    head.className="category";head.textContent=cat.name||"CATEGORY "+(ci+1);
+    board.append(head);
+  });
+  const rows=Math.max(1,...game.categories.map(c=>c.clues.length));
+  for(let ri=0;ri<rows;ri++){
+    game.categories.forEach((cat,ci)=>{
+      const clue=cat.clues[ri];
+      const b=document.createElement("button");
+      b.className="clue";
+      if(!clue){
+        b.disabled=true;b.textContent="—";
+      }else{
+        b.textContent=clue.used?"✓":(clue.value||0).toLocaleString();
+        b.disabled=clue.used||(!clue.question.trim()&&!clue.answer.trim());
+        b.onclick=()=>openClue(ci,ri);
+        b.title=clue.used?"Already played":"Open clue";
+      }
+      board.append(b);
+    });
+  }
+}
+function addTeam(){
+  if(game.teams.length>=12){alert("Maximum 12 teams.");return;}
+  game.teams.push({name:"Team "+nextTeam++,score:Number(game.start)||0});
+  renderTeams();
+}
+function openClue(ci,ri){
+  current={ci,ri};
+  const cat=game.categories[ci],c=cat.clues[ri];
+  $("clueHeading").textContent=cat.name+" · "+c.value;
+  $("questionText").textContent=c.question||"(No question entered)";
+  $("answerText").textContent=c.answer||"(No answer entered)";
+  $("answerText").style.display="none";
+  const select=$("activeTeam");select.innerHTML="";
+  game.teams.forEach((t,i)=>{
+    const o=document.createElement("option");
+    o.value=i;o.textContent=t.name+" ("+t.score+" points)";
+    select.append(o);
+  });
+  $("questionModal").classList.add("open");
+}
+function revealAnswer(){$("answerText").style.display="block";}
+function scoreClue(direction){
+  if(!current)return;
+  const c=game.categories[current.ci].clues[current.ri];
+  if(direction!==0){
+    if(game.teams.length){
+      const i=Number($("activeTeam").value);
+      game.teams[i].score+=direction*(Number(c.value)||0);
+    }
+    c.used=true;
+    $("status").textContent="Clue completed!";
+  }
+  current=null;
+  $("questionModal").classList.remove("open");
+  render();
+}
+function openEditor(){
+  editing=JSON.parse(JSON.stringify(game));
+  $("editTitle").value=editing.title;
+  $("editStart").value=editing.start||0;
+  renderEditor();
+  $("editorModal").classList.add("open");
+}
+function closeEditor(){$("editorModal").classList.remove("open");}
+function makeField(label,value,oninput,type="text"){
+  const wrap=document.createElement("div");wrap.className="field";
+  const l=document.createElement("label");l.textContent=label;
+  const input=document.createElement(type==="textarea"?"textarea":"input");
+  if(type!=="textarea")input.type=type;
+  input.value=value??"";
+  input.oninput=()=>oninput(input.value);
+  wrap.append(l,input);return wrap;
+}
+function renderEditor(){
+  const root=$("editorContent");root.innerHTML="";
+  editing.categories.forEach((cat,ci)=>{
+    const card=document.createElement("div");card.className="editor-card";
+    const title=document.createElement("h3");title.textContent="Category "+(ci+1);
+    card.append(title);
+    card.append(makeField("Category name",cat.name,v=>cat.name=v));
+    cat.clues.forEach((c,ri)=>{
+      const section=document.createElement("div");
+      section.style.borderTop="1px solid #40539a";
+      section.style.paddingTop="8px";
+      const heading=document.createElement("h4");
+      heading.textContent="Clue "+(ri+1);
+      section.append(heading);
+      const row=document.createElement("div");row.className="editor-grid";
+      row.append(
+        makeField("Point value",c.value,v=>c.value=Number(v)||0,"number"),
+        makeField("Question",c.question,v=>c.question=v,"textarea"),
+        makeField("Answer",c.answer,v=>c.answer=v,"textarea")
+      );
+      const reset=document.createElement("button");
+      reset.className="btn";reset.textContent=c.used?"Mark as unused":"Already unused";
+      reset.onclick=()=>{c.used=!c.used;renderEditor();};
+      section.append(row,reset);
+      card.append(section);
+    });
+    const remove=document.createElement("button");
+    remove.className="btn danger";remove.textContent="Delete category";
+    remove.onclick=()=>{if(editing.categories.length<=1)return alert("Keep at least one category.");editing.categories.splice(ci,1);renderEditor();};
+    card.append(remove);root.append(card);
+  });
+  const add=document.createElement("button");
+  add.className="btn";add.textContent="＋ Add category";
+  add.onclick=()=>{
+    if(editing.categories.length>=10)return alert("Maximum 10 categories.");
+    editing.categories.push({name:"New Category",clues:Array.from({length:5},(_,i)=>({value:(i+1)*200,question:"",answer:"",used:false}))});
+    renderEditor();
+  };
+  root.append(add);
+}
+function applyEditor(){
+  editing.title=$("editTitle").value.trim()||"JEOPARDY!";
+  editing.start=Number($("editStart").value)||0;
+  if(!editing.categories.length)return alert("Add at least one category.");
+  if(editing.categories.some(c=>c.clues.length===0))return alert("Each category needs at least one clue.");
+  editing.categories.forEach(c=>c.clues.forEach(clue=>clue.value=Number(clue.value)||0));
+  game=editing;editing=null;
+  closeEditor();render();
+  $("status").textContent="Game customized!";
+}
+function restoreDefaults(){
+  if(!confirm("Replace your current game with the sample game?"))return;
+  editing=makeDefault();
+  $("editTitle").value=editing.title;
+  $("editStart").value=editing.start;
+  renderEditor();
+}
+function saveGame(){
+  try{
+    localStorage.setItem("jeopardyBuilderSave",JSON.stringify(game));
+    $("toast").textContent="Game saved in this browser!";
+  }catch(e){alert("Could not save. Export your game as a JSON file instead.");}
+}
+function exportGame(){
+  const blob=new Blob([JSON.stringify(game,null,2)],{type:"application/json"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");a.href=url;
+  a.download=(game.title||"jeopardy").replace(/[^a-z0-9_-]/gi,"_")+".json";
+  a.click();URL.revokeObjectURL(url);
+}
+function importGame(event){
+  const file=event.target.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=()=>{
+    try{
+      const g=JSON.parse(reader.result);
+      if(!g||!Array.isArray(g.categories)||!Array.isArray(g.teams)||!g.categories.length)throw Error();
+      g.categories.forEach(c=>{
+        if(!Array.isArray(c.clues))throw Error();
+        c.clues.forEach(cl=>{
+          if(typeof cl.question!=="string"||typeof cl.answer!=="string")throw Error();
+          cl.value=Number(cl.value)||0;cl.used=Boolean(cl.used);
+        });
+      });
+      g.teams.forEach(t=>{
+        if(typeof t.name!=="string")throw Error();
+        t.score=Number(t.score)||0;
+      });
+      if(!confirm("Load this game and replace the current one?"))return;
+      game=g;render();$("status").textContent="Game imported!";
+    }catch(e){alert("That file is not a valid Jeopardy Builder game.");}
+    finally{event.target.value="";}
+  };
+  reader.readAsText(file);
+}
+function resetScores(){
+  if(confirm("Reset all team scores and played clues?")){
+    game.teams.forEach(t=>t.score=0);
+    game.categories.forEach(cat=>cat.clues.forEach(c=>c.used=false));
+    render();$("status").textContent="Game reset!";
+  }
+}
+function loadSaved(){
+  try{
+    const saved=localStorage.getItem("jeopardyBuilderSave");
+    if(saved){
+      const g=JSON.parse(saved);
+      if(g&&Array.isArray(g.categories)&&Array.isArray(g.teams)&&g.categories.length)game=g;
+    }
+  }catch(e){}
+}
+document.addEventListener("keydown",e=>{
+  if(e.key==="Escape"){
+    $("questionModal").classList.remove("open");
+    $("editorModal").classList.remove("open");
+    current=null;
+  }
+});
+loadSaved();render();
+</script>
+</body>
+</html>
